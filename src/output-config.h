@@ -51,11 +51,23 @@ struct OutputTargetConfig {
 using OutputTargetConfigPtr = std::shared_ptr<OutputTargetConfig>;
 
 
+// A named set of targets started and stopped together, like a vMix streaming
+// preset. Targets are stored once and may belong to any number of profiles.
+struct StreamProfileConfig {
+    std::string id;
+    std::string name;
+    std::vector<std::string> targetIds;
+};
+using StreamProfileConfigPtr = std::shared_ptr<StreamProfileConfig>;
+
+
 struct MultiOutputConfig {
 public:
     std::list<OutputTargetConfigPtr> targets;
     std::list<VideoEncoderConfigPtr> videoConfig;
     std::list<AudioEncoderConfigPtr> audioConfig;
+    std::list<StreamProfileConfigPtr> profiles;
+    std::optional<std::string> activeProfile; // empty = show every target
 };
 
 template<class T, class S>

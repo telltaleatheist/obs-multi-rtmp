@@ -9,6 +9,7 @@
 #include "plugin-support.h"
 
 #include "output-config.h"
+#include "stream-profiles.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -119,6 +120,10 @@ public:
         layout_->setAlignment(Qt::AlignmentFlag::AlignTop);
         layout_->setSizeConstraint(QLayout::SetMinAndMaxSize);
 
+        // stream profiles (this fork): pick which set of targets is shown and started
+        profileBar_ = new StreamProfileBar(container_, [this]() { ApplyProfileFilter(); });
+        layout_->addWidget(profileBar_);
+
         // init widget
         auto addButton = new QPushButton(obs_module_text("Btn.NewTarget"), container_);
         QObject::connect(addButton, &QPushButton::clicked, [this]() {
@@ -129,6 +134,7 @@ public:
             global.targets.emplace_back(target);
             auto pushWidget = AddPushWidget(newId);
             if (pushWidget->ShowEditDlg()) {
+                StreamProfileBar::OnTargetAdded(newId);
                 SaveConfig();
             } else {
                 DeletePushWidget(newId);
@@ -147,11 +153,11 @@ public:
         layout_->addWidget(allBtnContainer);
 
         QObject::connect(startAllButton, &QPushButton::clicked, [this]() {
-            for (auto x : GetAllPushWidgets())
+            for (auto x : GetAllPushWidgets(true))
                 x->StartStreaming();
         });
         QObject::connect(stopAllButton, &QPushButton::clicked, [this]() {
-            for (auto x : GetAllPushWidgets())
+            for (auto x : GetAllPushWidgets(true))
                 x->StopStreaming();
         });
  
@@ -283,12 +289,13 @@ public:
         fullLayout->addWidget(&scroll_, 0, 0);
     }
 
-    std::list<PushWidget*> GetAllPushWidgets()
+    // visibleOnly: just the targets of the active stream profile
+    std::list<PushWidget*> GetAllPushWidgets(bool visibleOnly = false)
     {
         std::list<PushWidget*> result;
         for (int row = 0; row < outputsContainer_->count(); ++row) {
             auto item = outputsContainer_->item(row);
-            if (!item) {
+            if (!item || (visibleOnly && item->isHidden())) {
                 continue;
             }
 
@@ -384,6 +391,19 @@ public:
         {
             AddPushWidget(x->id);
         }
+        if (profileBar_)
+            profileBar_->Reload();
+        ApplyProfileFilter();
+    }
+
+    void ApplyProfileFilter()
+    {
+        for (int row = 0; row < outputsContainer_->count(); ++row) {
+            auto item = outputsContainer_->item(row);
+            auto id = item->data(Qt::UserRole).toString().toStdString();
+            item->setHidden(!StreamProfileBar::TargetInActiveProfile(id));
+        }
+        outputsContainer_->updateGeometry();
     }
 
 private:
@@ -395,6 +415,8 @@ private:
     QScrollArea scroll_;
     // Widget, that contains output source widgets
     QListWidget* outputsContainer_ = 0;
+    // Stream profile picker (this fork)
+    StreamProfileBar* profileBar_ = 0;
 
     void DeletePushWidget(const std::string& targetId)
     {
@@ -444,6 +466,7 @@ private:
                 return;
             }
             DeletePushWidget(targetId);
+            StreamProfileBar::OnTargetDeleted(targetId);
             SaveConfig();
         });
 

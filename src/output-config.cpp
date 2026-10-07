@@ -104,6 +104,18 @@ static std::string SaveMultiOutputConfig(MultiOutputConfig& config) {
         ++audiocfg_count;
     }
 
+    nlohmann::json profiles(nlohmann::json::value_t::array);
+    for(auto& profile: config.profiles) {
+        nlohmann::json p;
+        p["id"] = profile->id;
+        p["name"] = profile->name;
+        p["targets"] = profile->targetIds;
+        profiles.push_back(p);
+    }
+    json["stream-profiles"] = profiles;
+    if (config.activeProfile.has_value())
+        json["active-profile"] = *config.activeProfile;
+
     json["targets"] = targets;
     json["video_configs"] = video_configs;
     json["audio_configs"] = audio_configs;
@@ -228,7 +240,29 @@ static MultiOutputConfig LoadMultiOutputConfig(const std::string& content) {
             }
         }
 
-        blog(LOG_INFO, TAG "Load %d targets, %d video configs, %d audio configs", target_count, videocfg_count, audiocfg_count);
+        it = json.find("stream-profiles");
+        if (it != json.end() && it->type() == nlohmann::json::value_t::array) {
+            for(auto& profile_json: *it) {
+                auto id = GetJsonField<std::string>(profile_json, "id");
+                if (!id.has_value())
+                    continue;
+                auto profile = std::make_shared<StreamProfileConfig>();
+                profile->id = *id;
+                profile->name = GetJsonField<std::string>(profile_json, "name").value_or("");
+                auto t = profile_json.find("targets");
+                if (t != profile_json.end() && t->is_array()) {
+                    for (auto& target_id: *t) {
+                        if (target_id.is_string())
+                            profile->targetIds.push_back(target_id.get<std::string>());
+                    }
+                }
+                config.profiles.emplace_back(profile);
+            }
+        }
+        config.activeProfile = GetJsonField<std::string>(json, "active-profile");
+
+        blog(LOG_INFO, TAG "Load %d targets, %d video configs, %d audio configs, %d stream profiles",
+            target_count, videocfg_count, audiocfg_count, (int)config.profiles.size());
         
         return config;
     }
@@ -291,6 +325,8 @@ std::string GenerateId(MultiOutputConfig& config) {
         if (has_id(config.audioConfig, newid))
             continue;
         if (has_id(config.videoConfig, newid))
+            continue;
+        if (has_id(config.profiles, newid))
             continue;
         return newid;
     }

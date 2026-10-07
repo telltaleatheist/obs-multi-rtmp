@@ -1,3 +1,22 @@
+# obs-multi-rtmp — fork with stream profiles
+
+This is a fork of [sorayuki/obs-multi-rtmp](https://github.com/sorayuki/obs-multi-rtmp). It adds
+**stream profiles**, like vMix streaming presets:
+
+- A **Stream profile** picker at the top of the Multiple output dock. A profile is a named set of
+  destinations (for example "Wednesday" = Twitch + one YouTube channel).
+- Picking a profile shows only its destinations, and **Start all / Stop all** start and stop exactly
+  those. Each destination keeps its own Start button.
+- Destinations are stored once and can belong to any number of profiles; deleting a profile never
+  deletes a destination.
+- Profiles are saved in the plugin's existing per-OBS-profile settings file, in a section the
+  original plugin ignores, so the file stays compatible both ways.
+
+Builds against OBS 32.2 with the upstream build files (`cmake --preset windows-x64`). Everything
+below is the upstream README.
+
+---
+
 # [Homepage / 主页](https://sorayuki.github.io/obs-multi-rtmp)
 
 ## 为什么首页是日语？ / Why is the homepage in Japanese?
